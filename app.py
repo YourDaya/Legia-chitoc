@@ -1,65 +1,115 @@
 import streamlit as st
 import graphviz
-from supabase import create_client, Client
+from supabase import create_client
 
-# --- CẤU HÌNH KẾT NỐI (Lấy từ Secrets của Streamlit Cloud) ---
+# --- 1. CẤU HÌNH KẾT NỐI (Lấy từ Secrets) ---
 try:
-    # Thử lấy từ Secrets (khi chạy trên Web)
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
-    # Dự phòng
-    st.error("Chưa cấu hình Secrets!")
+    st.error("Chưa cấu hình Secrets trên Streamlit Cloud!")
+    st.stop()
 
-# Kết nối đến Supabase
 @st.cache_resource
 def init_connection():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 supabase = init_connection()
 
-# --- GIAO DIỆN WEB ---
-st.title("🌳 Gia Phả Dòng Họ Lê")
+# --- 2. GIAO DIỆN WEB ---
+st.set_page_config(page_title="Gia Phả Dòng Họ Lê", layout="wide", page_icon="zk")
 
-# Lấy dữ liệu từ Database về
+# CSS tùy chỉnh để làm đẹp giao diện Streamlit (ẩn bớt viền thừa, font chữ to rõ)
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #f5f5f5; /* Màu nền xám nhẹ dịu mắt */
+    }
+    h1 {
+        color: #8B0000; /* Màu đỏ mận truyền thống */
+        text-align: center;
+        font-family: 'Times New Roman', serif;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Sidebar
+with st.sidebar:
+    st.header("🔍 Tra cứu thành viên")
+    search_name = st.text_input("Nhập tên:", placeholder="Ví dụ: Lê Văn...")
+    st.info("💡 **Mẹo:**\n- Dùng chuột lăn để phóng to/thu nhỏ.\n- Bấm giữ chuột trái để kéo di chuyển cây.")
+
+# Tiêu đề chính
+st.title("GIA PHẢ DÒNG HỌ LÊ - CHI LỘC")
+st.markdown("<p style='text-align: center; color: gray;'>Cây gia phả hiển thị theo ngôi thứ từ trên xuống dưới</p>", unsafe_allow_html=True)
+
+# Lấy dữ liệu
 response = supabase.table("members").select("*").execute()
 members = response.data
 
 if not members:
-    st.warning("Chưa có dữ liệu thành viên nào!")
+    st.warning("Đang tải dữ liệu hoặc chưa có thành viên nào...")
 else:
-    # --- VẼ CÂY GIA PHẢ ---
-    # Tạo đối tượng biểu đồ
-    graph = graphviz.Digraph()
-    graph.attr(rankdir='TB') # TB = Top to Bottom (Trên xuống dưới)
-    graph.attr('node', shape='box', style='rounded,filled', fillcolor='lightblue')
+    # --- 3. VẼ CÂY GIA PHẢ (Phong cách Truyền thống & Hiện đại) ---
+    
+    # rankdir='TB': Top to Bottom (Trên xuống Dưới) - Chuẩn truyền thống
+    # splines='ortho': Đường kẻ vuông góc (Giống sơ đồ trong ảnh bạn gửi)
+    graph = graphviz.Digraph(format='svg')
+    graph.attr(rankdir='TB', splines='ortho')
+    
+    # Tăng khoảng cách để cây không bị dính chùm
+    graph.attr(nodesep='0.5', ranksep='0.8')
+    
+    # Cấu hình chung cho Ô Tên (Node)
+    # shape='box': Hình hộp chữ nhật (giống ảnh cũ)
+    # style='filled,rounded': Tô màu nền và bo tròn góc (nét hiện đại)
+    graph.attr('node', shape='box', style='filled,rounded', 
+               fontname='Arial', fontsize='13', penwidth='1.5')
+    
+    # Cấu hình đường nối (Edge) - Màu xám đậm cho trang trọng
+    graph.attr('edge', color='#444444', arrowsize='0.6', penwidth='1.2')
 
-    # Duyệt qua danh sách thành viên để tạo Nút (Node) và Đường nối (Edge)
     for member in members:
-        # 1. Tạo hình cho thành viên này
-        # Nội dung hiển thị: Tên + (Đời thứ mấy)
-        label = f"{member['full_name']}\n(Đời {member['generation']})"
+        # --- PHÂN MÀU THEO THẾ HỆ (Để dễ nhìn ngôi thứ) ---
+        gen = member['generation']
         
-        # Tô màu khác cho các cụ tổ (Đời 1-10) để nổi bật
-        color = 'gold' if member['generation'] and member['generation'] < 15 else 'lightblue'
+        # Mặc định
+        fill_color = '#ffffff' 
+        font_color = 'black'
+        border_color = 'black'
         
-        graph.node(str(member['id']), label=label, fillcolor=color)
+        # Logic màu sắc (Mô phỏng bảng màu phong thủy/truyền thống)
+        if gen == 1: 
+            fill_color = '#FFD700' # Vàng kim (Thủy tổ)
+            border_color = '#B8860B'
+        elif gen == 2: 
+            fill_color = '#FFDEAD' # Màu da người/Cam nhạt
+        elif gen is not None and gen < 15: 
+            fill_color = '#F0F8FF' # Xanh nhạt (Các cụ xưa)
+        else: 
+            fill_color = '#FFFFFF' # Trắng (Đời nay cho sạch sẽ)
+            border_color = '#2E8B57' # Viền xanh lá cây (như nhánh Lộc Chi trong ảnh)
 
-        # 2. Nếu có cha, vẽ đường nối từ Cha -> Con
+        # Highlight khi tìm kiếm (Đổi sang màu Đỏ Đậm)
+        if search_name and search_name.lower() in member['full_name'].lower():
+            fill_color = '#DC143C' # Đỏ thắm
+            font_color = 'white'
+            border_color = '#8B0000'
+
+        # Nội dung hiển thị (Tên + Đời in nhỏ)
+        # Sử dụng HTML label để format chữ đẹp hơn
+        label = f'<{member["full_name"]}<BR/><FONT POINT-SIZE="10" COLOR="#555555">Đời thứ {gen}</FONT>>'
+        
+        graph.node(str(member['id']), label=label, 
+                   fillcolor=fill_color, fontcolor=font_color, color=border_color)
+
+        # Vẽ đường nối
         if member['father_id']:
             graph.edge(str(member['father_id']), str(member['id']))
 
-    # Hiển thị lên màn hình
+    # Hiển thị biểu đồ
     st.graphviz_chart(graph, use_container_width=True)
 
-    # --- BẢNG TRA CỨU BÊN DƯỚI ---
-    st.divider()
-    st.subheader("Tra cứu thành viên")
-    search_name = st.text_input("Nhập tên cần tìm:")
-    if search_name:
-        # Lọc danh sách (Python list filtering)
-        results = [m for m in members if search_name.lower() in m['full_name'].lower()]
-        st.dataframe(results)
-    else:
-        with st.expander("Xem danh sách đầy đủ"):
-            st.dataframe(members)
+    # Bảng dữ liệu (để ẩn cho gọn, ai cần mới mở)
+    with st.expander("📖 Xem danh sách chi tiết"):
+        st.dataframe(members)
