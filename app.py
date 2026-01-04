@@ -2,12 +2,12 @@ import streamlit as st
 import graphviz
 from supabase import create_client
 
-# --- 1. CẤU HÌNH KẾT NỐI (Lấy từ Secrets) ---
+# --- 1. KẾT NỐI (Giữ nguyên) ---
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
-    st.error("Chưa cấu hình Secrets trên Streamlit Cloud!")
+    st.error("Chưa cấu hình Secrets!")
     st.stop()
 
 @st.cache_resource
@@ -16,100 +16,106 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- 2. GIAO DIỆN WEB ---
-st.set_page_config(page_title="Gia Phả Dòng Họ Lê", layout="wide", page_icon="zk")
+# --- 2. CẤU HÌNH GIAO DIỆN ---
+st.set_page_config(page_title="Gia Phả Lê Tộc", layout="wide", page_icon="📜")
 
-# CSS tùy chỉnh để làm đẹp giao diện Streamlit (ẩn bớt viền thừa, font chữ to rõ)
+# CSS để ẩn bớt khoảng trắng thừa, tối ưu cho màn hình ngang
 st.markdown("""
 <style>
-    .stApp {
-        background-color: #f5f5f5; /* Màu nền xám nhẹ dịu mắt */
-    }
-    h1 {
-        color: #8B0000; /* Màu đỏ mận truyền thống */
-        text-align: center;
-        font-family: 'Times New Roman', serif;
-    }
+    .stApp { background-color: #fdfcf0; } /* Màu nền giấy cũ */
+    h1 { color: #800000; font-family: 'Times New Roman'; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.header("🔍 Tra cứu thành viên")
-    search_name = st.text_input("Nhập tên:", placeholder="Ví dụ: Lê Văn...")
-    st.info("💡 **Mẹo:**\n- Dùng chuột lăn để phóng to/thu nhỏ.\n- Bấm giữ chuột trái để kéo di chuyển cây.")
+    st.header("🔍 Tìm kiếm")
+    search_name = st.text_input("Nhập tên thành viên:", placeholder="Ví dụ: Lê Văn...")
+    st.divider()
+    st.write("Dữ liệu lấy từ nhánh: **Lộc Chi**")
 
-# Tiêu đề chính
 st.title("GIA PHẢ DÒNG HỌ LÊ - CHI LỘC")
-st.markdown("<p style='text-align: center; color: gray;'>Cây gia phả hiển thị theo ngôi thứ từ trên xuống dưới</p>", unsafe_allow_html=True)
 
-# Lấy dữ liệu
+# --- 3. XỬ LÝ DỮ LIỆU ---
 response = supabase.table("members").select("*").execute()
 members = response.data
 
-if not members:
-    st.warning("Đang tải dữ liệu hoặc chưa có thành viên nào...")
-else:
-    # --- 3. VẼ CÂY GIA PHẢ (Phong cách Truyền thống & Hiện đại) ---
-    
-    # rankdir='TB': Top to Bottom (Trên xuống Dưới) - Chuẩn truyền thống
-    # splines='ortho': Đường kẻ vuông góc (Giống sơ đồ trong ảnh bạn gửi)
+if members:
+    # --- 4. VẼ CÂY PHONG CÁCH TRUYỀN THỐNG ---
+    # splines='ortho': Bắt buộc đường kẻ vuông góc
+    # nodesep, ranksep: Chỉnh khoảng cách để cây gọn hơn
     graph = graphviz.Digraph(format='svg')
-    graph.attr(rankdir='TB', splines='ortho')
+    graph.attr(rankdir='TB', splines='ortho', nodesep='0.2', ranksep='0.5')
     
-    # Tăng khoảng cách để cây không bị dính chùm
-    graph.attr(nodesep='0.5', ranksep='0.8')
+    # Cấu hình chung cho Node (Ô tên)
+    # shape='rect': Hình chữ nhật
+    # fontname: Font có chân cho trang trọng
+    graph.attr('node', shape='rect', style='filled,bold', 
+               fontname='Times-Bold', fontsize='11', penwidth='1')
     
-    # Cấu hình chung cho Ô Tên (Node)
-    # shape='box': Hình hộp chữ nhật (giống ảnh cũ)
-    # style='filled,rounded': Tô màu nền và bo tròn góc (nét hiện đại)
-    graph.attr('node', shape='box', style='filled,rounded', 
-               fontname='Arial', fontsize='13', penwidth='1.5')
-    
-    # Cấu hình đường nối (Edge) - Màu xám đậm cho trang trọng
-    graph.attr('edge', color='#444444', arrowsize='0.6', penwidth='1.2')
+    # Cấu hình đường nối (Màu đen, mảnh)
+    graph.attr('edge', color='black', arrowsize='0.5', penwidth='0.8')
 
     for member in members:
-        # --- PHÂN MÀU THEO THẾ HỆ (Để dễ nhìn ngôi thứ) ---
         gen = member['generation']
+        full_name = member['full_name']
         
-        # Mặc định
-        fill_color = '#ffffff' 
+        # --- LOGIC MÀU SẮC (Mô phỏng ảnh gia phả mẫu) ---
+        # Mặc định (Trắng)
+        fill_color = '#ffffff'
         font_color = 'black'
-        border_color = 'black'
         
-        # Logic màu sắc (Mô phỏng bảng màu phong thủy/truyền thống)
-        if gen == 1: 
-            fill_color = '#FFD700' # Vàng kim (Thủy tổ)
-            border_color = '#B8860B'
-        elif gen == 2: 
-            fill_color = '#FFDEAD' # Màu da người/Cam nhạt
-        elif gen is not None and gen < 15: 
-            fill_color = '#F0F8FF' # Xanh nhạt (Các cụ xưa)
-        else: 
-            fill_color = '#FFFFFF' # Trắng (Đời nay cho sạch sẽ)
-            border_color = '#2E8B57' # Viền xanh lá cây (như nhánh Lộc Chi trong ảnh)
-
-        # Highlight khi tìm kiếm (Đổi sang màu Đỏ Đậm)
-        if search_name and search_name.lower() in member['full_name'].lower():
-            fill_color = '#DC143C' # Đỏ thắm
+        # Đời 15, 16, 17 (Cụ Luật, Dư, Minh...) -> Màu Tím/Xanh đậm (như ảnh)
+        if gen and gen <= 17:
+            fill_color = '#483D8B' # Dark Slate Blue
             font_color = 'white'
-            border_color = '#8B0000'
+            
+        # Đời 18 (Cụ Kiệm, Cần...) -> Màu Vàng/Cam
+        elif gen == 18:
+            fill_color = '#FFD700' # Gold
+            font_color = 'black'
+            
+        # Đời 19 (Cụ Khuyên...) -> Màu Xanh lá
+        elif gen == 19:
+            fill_color = '#2E8B57' # Sea Green
+            font_color = 'white'
+            
+        # Đời 20 (Cụ Làng, Miên...) -> Màu Đỏ (Các ô dọc trong ảnh)
+        elif gen == 20:
+            fill_color = '#B22222' # Firebrick
+            font_color = 'white'
+            
+        # Đời 21 trở đi -> Màu vàng nhạt hoặc trắng
+        elif gen >= 21:
+            fill_color = '#FFFACD' # Lemon Chiffon
+            font_color = 'black'
 
-        # Nội dung hiển thị (Tên + Đời in nhỏ)
-        # Sử dụng HTML label để format chữ đẹp hơn
-        label = f'<{member["full_name"]}<BR/><FONT POINT-SIZE="10" COLOR="#555555">Đời thứ {gen}</FONT>>'
-        
+        # Nếu đang tìm kiếm -> Tô màu hồng đậm để nổi bật
+        if search_name and search_name.lower() in full_name.lower():
+            fill_color = '#FF1493'
+            font_color = 'white'
+
+        # --- TẠO NHÃN (LABEL) ---
+        # Dùng HTML để ngắt dòng đẹp hơn
+        label = f'''<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>{full_name}</B></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9">Đời {gen}</FONT></TD></TR>
+        </TABLE>
+        >'''
+
         graph.node(str(member['id']), label=label, 
-                   fillcolor=fill_color, fontcolor=font_color, color=border_color)
+                   fillcolor=fill_color, fontcolor=font_color)
 
         # Vẽ đường nối
         if member['father_id']:
             graph.edge(str(member['father_id']), str(member['id']))
 
-    # Hiển thị biểu đồ
+    # Hiển thị
     st.graphviz_chart(graph, use_container_width=True)
-
-    # Bảng dữ liệu (để ẩn cho gọn, ai cần mới mở)
-    with st.expander("📖 Xem danh sách chi tiết"):
+    
+    with st.expander("📄 Xem danh sách dạng bảng"):
         st.dataframe(members)
+
+else:
+    st.info("Đang tải dữ liệu...")
