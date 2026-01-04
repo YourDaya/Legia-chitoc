@@ -2,9 +2,14 @@ import streamlit as st
 import graphviz
 from supabase import create_client, Client
 
-# --- CẤU HÌNH KẾT NỐI (Dán Key của bạn vào đây) ---
-SUPABASE_URL = "https://ihykfmntygyhrsbakmdk.supabase.co"
-SUPABASE_KEY = "sb_publishable_6E4kh5HrQWCSAWg8Iu4n3g_NZOuecdN"
+# --- CẤU HÌNH KẾT NỐI (Lấy từ Secrets của Streamlit Cloud) ---
+try:
+    # Thử lấy từ Secrets (khi chạy trên Web)
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except:
+    # Dự phòng
+    st.error("Chưa cấu hình Secrets!")
 
 # Kết nối đến Supabase
 @st.cache_resource
