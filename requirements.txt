@@ -1,3 +1,5 @@
 streamlit
 supabase
 graphviz
+pandas
+plotly
